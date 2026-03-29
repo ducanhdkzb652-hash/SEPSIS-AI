@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SepsisAI — Phát Hiện Nhiễm Trùng Huyết Sớm</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Noto+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #03070f;
+  --bg2:     #080f1c;
+  --card:    #0b1628;
+  --acc:     #00e5ff;
+  --acc2:    #ff3d6b;
+  --green:   #00ff9f;
+  --warn:    #ffb703;
+  --text:    #d8e8f0;
+  --muted:   #4a6070;
+  --border:  rgba(0,229,255,0.12);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+background: var(–bg);
+color: var(–text);
+font-family: ‘Noto Sans’, sans-serif;
+font-weight: 300;
+overflow-x: hidden;
+cursor: none;
+}
+
+/* ── CUSTOM CURSOR ── */
+.cursor {
+position: fixed; width: 10px; height: 10px;
+background: var(–acc); border-radius: 50%;
+pointer-events: none; z-index: 9999;
+transform: translate(-50%,-50%);
+transition: transform .1s, background .2s;
+mix-blend-mode: screen;
+}
+.cursor-ring {
+position: fixed; width: 36px; height: 36px;
+border: 1px solid var(–acc);
+border-radius: 50%; pointer-events: none; z-index: 9998;
+transform: translate(-50%,-50%);
+transition: all .18s ease;
+opacity: 0.5;
+}
+
+/* ── NOISE OVERLAY ── */
+body::before {
+content: ‘’;
+position: fixed; inset: 0; z-index: 0;
+background-image: url(“data:image/svg+xml,%3Csvg viewBox=‘0 0 200 200’ xmlns=‘http://www.w3.org/2000/svg’%3E%3Cfilter id=‘n’%3E%3CfeTurbulence type=‘fractalNoise’ baseFrequency=‘0.75’ numOctaves=‘4’ stitchTiles=‘stitch’/%3E%3C/filter%3E%3Crect width=‘100%25’ height=‘100%25’ filter=‘url(%23n)’ opacity=‘0.03’/%3E%3C/svg%3E”);
+opacity: 0.4; pointer-events: none;
+}
+
+/* ── SCANLINE ── */
+body::after {
+content: ‘’;
+position: fixed; inset: 0; z-index: 1; pointer-events: none;
+background: repeating-linear-gradient(
+0deg, transparent, transparent 2px,
+rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+);
+}
+
+/* ── NAV ── */
+nav {
+position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+display: flex; align-items: center; justify-content: space-between;
+padding: 18px 6vw;
+background: rgba(3,7,15,0.85);
+backdrop-filter: blur(20px);
+border-bottom: 1px solid var(–border);
+}
+
+.logo {
+font-family: ‘Rajdhani’, sans-serif;
+font-size: 1.5rem; font-weight: 700;
+color: var(–acc); letter-spacing: .12em;
+}
+.logo span { color: var(–acc2); }
+
+nav ul { list-style: none; display: flex; gap: 2.5rem; }
+nav ul a {
+font-family: ‘Rajdhani’, sans-serif;
+font-size: .9rem; font-weight: 500;
+color: var(–muted); text-decoration: none;
+letter-spacing: .08em; text-transform: uppercase;
+transition: color .2s;
+}
+nav ul a:hover { color: var(–acc); }
+
+.nav-cta {
+background: transparent;
+border: 1px solid var(–acc);
+color: var(–acc) !important;
+padding: 8px 20px; border-radius: 2px;
+transition: background .2s, color .2s !important;
+}
+.nav-cta:hover { background: var(–acc); color: var(–bg) !important; }
+
+/* ── HERO ── */
+.hero {
+position: relative; min-height: 100vh;
+display: flex; align-items: center;
+padding: 120px 6vw 80px;
+overflow: hidden;
+}
+
+.hero-bg {
+position: absolute; inset: 0; z-index: 0;
+background:
+radial-gradient(ellipse 80% 60% at 60% 40%, rgba(0,229,255,0.06) 0%, transparent 70%),
+radial-gradient(ellipse 50% 40% at 20% 80%, rgba(255,61,107,0.04) 0%, transparent 60%);
+}
+
+/* Animated grid */
+.hero-grid {
+position: absolute; inset: 0; z-index: 0;
+background-image:
+linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
+linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
+background-size: 60px 60px;
+mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+animation: gridPulse 8s ease-in-out infinite;
+}
+@keyframes gridPulse {
+0%,100% { opacity: .6; }
+50%      { opacity: 1; }
+}
+
+.hero-content { position: relative; z-index: 2; max-width: 600px; }
+
+.hero-badge {
+display: inline-flex; align-items: center; gap: 8px;
+background: rgba(0,229,255,0.08);
+border: 1px solid rgba(0,229,255,0.2);
+border-radius: 2px; padding: 6px 14px;
+font-family: ‘Rajdhani’, sans-serif;
+font-size: .8rem; letter-spacing: .14em;
+color: var(–acc); text-transform: uppercase;
+margin-bottom: 1.8rem;
+animation: fadeUp .8s ease both;
+}
+.hero-badge::before {
+content: ‘’; width: 6px; height: 6px;
+background: var(–green); border-radius: 50%;
+animation: blink 1.4s ease infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+h1 {
+font-family: ‘Rajdhani’, sans-serif;
+font-size: clamp(2.6rem, 5vw, 4rem);
+font-weight: 700; line-height: 1.1;
+letter-spacing: -.01em;
+color: #fff;
+animation: fadeUp .9s .1s ease both;
+}
+h1 .acc  { color: var(–acc); }
+h1 .acc2 { color: var(–acc2); }
+
+.hero-sub {
+margin: 1.4rem 0 2.4rem;
+font-size: 1.05rem; line-height: 1.7;
+color: var(–muted);
+animation: fadeUp .9s .2s ease both;
+}
+
+.hero-btns {
+display: flex; gap: 1rem; flex-wrap: wrap;
+animation: fadeUp .9s .3s ease both;
+}
+
+.btn-primary {
+display: inline-flex; align-items: center; gap: 10px;
+background: var(–acc); color: var(–bg);
+font-family: ‘Rajdhani’, sans-serif;
+font-size: 1rem; font-weight: 700;
+letter-spacing: .08em; text-transform: uppercase;
+padding: 14px 28px; border-radius: 2px;
+text-decoration: none; border: none; cursor: none;
+transition: transform .2s, box-shadow .2s;
+box-shadow: 0 0 30px rgba(0,229,255,0.25);
+}
+.btn-primary:hover {
+transform: translateY(-2px);
+box-shadow: 0 0 50px rgba(0,229,255,0.45);
+}
+
+.btn-ghost {
+display: inline-flex; align-items: center; gap: 10px;
+background: transparent;
+border: 1px solid var(–muted);
+color: var(–text);
+font-family: ‘Rajdhani’, sans-serif;
+font-size: 1rem; font-weight: 600;
+letter-spacing: .08em; text-transform: uppercase;
+padding: 14px 28px; border-radius: 2px;
+text-decoration: none; cursor: none;
+transition: border-color .2s, color .2s;
+}
+.btn-ghost:hover { border-color: var(–acc); color: var(–acc); }
+
+/* ECG canvas */
+.hero-visual {
+position: absolute; right: 0; top: 0; bottom: 0;
+width: 55%; z-index: 1;
+display: flex; flex-direction: column;
+align-items: center; justify-content: center;
+}
+
+.ecg-wrap {
+position: relative; width: 100%; height: 280px;
+border: 1px solid var(–border);
+background: rgba(8,15,28,0.6);
+backdrop-filter: blur(10px);
+border-radius: 4px; overflow: hidden;
+}
+.ecg-wrap::before {
+content: ‘LIVE  PPG SIGNAL’;
+position: absolute; top: 12px; left: 16px;
+font-family: ‘Rajdhani’, sans-serif;
+font-size: .75rem; letter-spacing: .16em;
+color: var(–acc); opacity: .7;
+}
+canvas#ecg { width: 100%; height: 100%; }
+
+.monitor-stats {
+display: grid; grid-template-columns: repeat(3,1fr);
+gap: 1px; width: 100%;
+background: var(–border);
+margin-top: 1px;
+}
+.stat-card {
+background: rgba(8,15,28,0.8);
+padding: 14px 20px; text-align: center;
+}
+.stat-val {
+font-family: ‘Rajdhani’, sans-serif;
+font-size: 1.8rem; font-weight: 700;
+color: var(–acc);
+}
+.stat-val.green { color: var(–green); }
+.stat-val.warn  { color: var(–warn); }
+.stat-lbl {
+font-size: .72rem; letter-spacing: .1em;
+color: var(–muted); text-transform: uppercase;
+}
+
+/* ── SECTIONS ── */
+section { padding: 100px 6vw; position: relative; z-index: 2; }
+
+.section-tag {
+font-family: ‘Rajdhani’, sans-serif;
+font-size: .78rem; letter-spacing: .2em;
+text-transform: uppercase; color: var(–acc);
+margin-bottom: .8rem;
+}
+
+h2 {
+font-family: ‘Rajdhani’, sans-serif;
+font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+font-weight: 700; color: #fff; line-height: 1.15;
+margin-bottom: 1rem;
+}
+
+/* ── STATS BAR ── */
+.stats-bar {
+display: grid; grid-template-columns: repeat(4,1fr);
+gap: 1px; background: var(–border);
+border-top: 1px solid var(–border);
+border-bottom: 1px solid var(–border);
+}
+.stats-bar-item {
+background: var(–card);
+padding: 40px 20px; text-align: center;
+}
+.stats-bar-num {
+font-family: ‘Rajdhani’, sans-serif;
+font-size: 2.8rem; font-weight: 700;
+color: var(–acc);
+display: block;
+}
+.stats-bar-lbl {
+font-size: .82rem; color: var(–muted);
+text-transform: uppercase; letter-spacing: .1em;
+}
+
+/* ── HOW IT WORKS ── */
+.steps {
+display: grid; grid-template-columns: repeat(4,1fr);
+gap: 2px; margin-top: 3rem;
+background: var(–border);
+}
+.step {
+background: var(–card);
+padding: 2.5rem 1.8rem;
+position: relative; overflow: hidden;
+transition: background .3s;
+}
+.step:hover { background: #0f1e35; }
+.step-num {
+font-family: ‘Rajdhani’, sans-serif;
+font-size: 4rem; font-weight: 700;
+color: rgba(0,229,255,0.08);
+position: absolute; top: 10px; right: 16px;
+line-height: 1;
+}
+.step-icon {
+font-size: 2rem; margin-bottom: 1rem;
+display: block;
+}
+.step h3 {
+font-family: ‘Rajdhani’, sans-serif;
+font-size: 1.1rem; font-weight: 600;
+color: #fff; margin-bottom: .6rem;
+letter-spacing: .04em;
+}
+.step p { font-size: .88rem; line-height: 1.65; color: var(–muted); }
+
+/* ── FEATURES ── */
+.features-grid {
+display: grid; grid-template-columns: repeat(3,1fr);
+gap: 1.5rem; margin-top: 3rem;
+}
+.feat-card {
+background: var(–card);
+border: 1px solid var(–border);
+border-radius: 4px; padding: 2rem;
+transition: border-color .3s, transform .3s;
+position: relative; overflow: hidden;
+}
+.feat-card::after {
+content: ‘’;
+position: absolute; inset: 0;
+background: radial-gradient(ellipse at 0% 0%, rgba(0,229,255,0.05) 0%, transparent 60%);
+opacity: 0; transition: opacity .3s;
+}
+.feat-card:hover { border-color: rgba(0,229,255,0.35); transform: translateY(-4px); }
+.feat-card:hover::after { opacity: 1; }
+
+.feat-icon {
+width: 44px; height: 44px;
+background: rgba(0,229,255,0.1);
+border: 1px solid rgba(0,229,255,0.2);
+border-radius: 3px;
+display: flex; align-items: center; justify-content: center;
+font-size: 1.3rem; margin-bottom: 1.2rem;
+}
+.feat-card h3 {
+font-family: ‘Rajdhani’, sans-serif;
+font-size: 1.05rem; font-weight: 600;
+color: #fff; margin-bottom: .5rem;
+}
+.feat-card p { font-size: .87rem; line-height: 1.65; color: var(–muted); }
+
+/* ── AI SECTION ── */
+.ai-section {
+display: grid; grid-template-columns: 1fr 1fr;
+gap: 5vw; align-items: center;
+}
+
+.ai-arch {
+background: var(–card);
+border: 1px solid va
